@@ -1,10 +1,10 @@
-module github.com/icecube092/suspender
+module github.com/icecube092/valmux
 
-go 1.19
+go 1.24.0
 
 require (
-	github.com/stretchr/testify v1.8.1
-	golang.org/x/exp v0.0.0-20230118134722-a68e582fa157
+	github.com/stretchr/testify v1.11.1
+	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
 )
 
 require (
