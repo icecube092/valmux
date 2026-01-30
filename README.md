@@ -47,7 +47,7 @@ err = s.Inc(id) // nil
 #### Store with context
 
 ```go
-s := NewSingle(1)
+s := NewStore(1)
 
 id := "1"
 
