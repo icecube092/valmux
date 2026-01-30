@@ -28,12 +28,12 @@ func NewSingle(maxCount uint64, opts ...SingleOption) *Single {
 	return s
 }
 
-// IncAutoDec increments immediately and then decrements in background on context done.
+// IncAutoDec increments value and then decrements it in background on context done.
 func (v *Single) IncAutoDec(ctx context.Context) error {
 	return v.AddAutoSub(ctx, 1)
 }
 
-// AddAutoSub adds value immediately and then subtracts it in background on context done.
+// AddAutoSub adds value and then subtracts it in background on context done.
 func (v *Single) AddAutoSub(ctx context.Context, value uint64) error {
 	if err := v.AddCtx(ctx, value); err != nil {
 		return err
