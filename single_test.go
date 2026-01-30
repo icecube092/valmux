@@ -52,7 +52,7 @@ func TestSingle(t *testing.T) {
 			},
 		},
 		{
-			name:   "IncCtx",
+			name:   "IncAutoDec",
 			valmux: NewSingle(2),
 			do: func(v *Single) {
 				var err error
@@ -66,11 +66,11 @@ func TestSingle(t *testing.T) {
 				)
 				defer cancel()
 
-				err = v.IncCtx(ctx)
+				err = v.IncAutoDec(ctx)
 				if err != nil {
 					t.Fatal(err)
 				}
-				err = v.IncCtx(ctx)
+				err = v.IncAutoDec(ctx)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -84,7 +84,7 @@ func TestSingle(t *testing.T) {
 			},
 		},
 		{
-			name:   "IncCtx WithWaiting timeout exceeded",
+			name:   "IncAutoDec WithWaiting timeout exceeded",
 			valmux: NewSingle(1, WithWaiting(time.Millisecond)),
 			do: func(v *Single) {
 				const timeout = 10 * time.Millisecond
@@ -96,11 +96,11 @@ func TestSingle(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
 
-				err = v.IncCtx(ctx)
+				err = v.IncAutoDec(ctx)
 				if err != nil {
 					t.Fatal(err)
 				}
-				err = v.IncCtx(ctx)
+				err = v.IncAutoDec(ctx)
 				if !errors.Is(err, context.DeadlineExceeded) {
 					t.Fatal(err)
 				}
@@ -113,7 +113,7 @@ func TestSingle(t *testing.T) {
 			},
 		},
 		{
-			name:   "AddCtx WithWaiting",
+			name:   "AddAutoSub WithWaiting",
 			valmux: NewSingle(2, WithWaiting(time.Millisecond)),
 			do: func(v *Single) {
 				const timeout = 10 * time.Millisecond
@@ -127,7 +127,7 @@ func TestSingle(t *testing.T) {
 				biggerCtx, cancel2 := context.WithTimeout(context.Background(), timeout*2)
 				defer cancel2()
 
-				err = v.AddCtx(ctx, 1)
+				err = v.AddAutoSub(ctx, 1)
 				if err != nil {
 					t.Fatal(err)
 					return
@@ -135,7 +135,7 @@ func TestSingle(t *testing.T) {
 
 				waitCh := make(chan struct{})
 				go func() {
-					err = v.AddCtx(biggerCtx, 2)
+					err = v.AddAutoSub(biggerCtx, 2)
 					if err != nil {
 						t.Error(err)
 					}

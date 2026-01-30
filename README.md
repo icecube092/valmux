@@ -14,7 +14,8 @@ s.Dec()
 err = s.Inc() // nil
 ```
 
-#### Single with context
+
+#### Single with ctx
 
 ```go
 s := NewSingle(1)
@@ -25,7 +26,21 @@ err = s.IncCtx(ctx) // error: already locked
 
 cancel()
 
-err = s.IncCtx(ctx) // nil
+err = s.IncCtx(ctx) // error: already locked
+```
+
+#### Single with auto-decrement
+
+```go
+s := NewSingle(1)
+
+ctx, cancel := context.WithCancel(context.Background())
+err := s.IncAutoDec(ctx) // nil
+err = s.IncAutoDec(ctx) // error: already locked
+
+cancel()
+
+err = s.IncAutoDec(ctx) // nil
 ```
 
 ### Store

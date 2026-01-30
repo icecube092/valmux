@@ -51,7 +51,7 @@ func TestStore(t *testing.T) {
 			},
 		},
 		{
-			name:   "IncCtx",
+			name:   "IncAutoDec",
 			valmux: NewStore[string](2),
 			do: func(v *Store[string]) {
 				var err error
