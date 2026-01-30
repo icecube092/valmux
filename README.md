@@ -1,41 +1,33 @@
-# Suspending execution based on value
-
-Suspender is a value-based mutex.
+# Value-based mutex library
 
 ## Example
 
-### Simple
+### Single
 
 ```go
-s := suspender.New[uint64](suspender.Config{Count: 1})
+s := NewSingle(1)
 
-userID := uint64(1)
+err := s.Inc() // nil
+err = s.Inc() // error: already locked
 
-err := s.Inc(userID) // nil
+err = s.Inc() // nil
 
-err = s.Inc(userID) // error: already locked for this user
-
-userID2 := uint64(2)
-
-err = s.Inc(userID2) // nil
-
-err = s.Dec(userID) // nil
-err = s.Inc(userID) // nil
+s.Dec()
+err = s.Inc() // nil
 ```
 
-### Auto-unlock on context done
+### Single with context
+
+#### Be careful with timeoutless contexts: possible memory leak
 
 ```go
-s := suspender.New[uint64](suspender.Config{Count: 1})
-
-userID := uint64(1)
+s := NewSingle(1)
 
 ctx, cancel := context.WithCancel(context.Background())
-err := s.IncWithCtx(ctx, userID) // nil
-err = s.IncWithCtx(ctx, userID) // error: already locked
+err := s.IncCtx(ctx) // nil
+err = s.IncCtx(ctx) // error: already locked
 
 cancel()
 
-// notice: unlock may take some time
-err = s.IncWithCtx(ctx, userID) // nil
+err = s.IncCtx(ctx) // nil
 ```
