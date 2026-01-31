@@ -14,7 +14,7 @@ Operations:
 - Decrement, Sub
 - Reset
 
-### Simple
+### ValMux
 
 ```go
 s := New(1)
@@ -27,7 +27,7 @@ err = s.Inc() // nil
 
 ```
 
-### With context
+#### With context
 
 ```go
 s := New(1)
@@ -41,7 +41,7 @@ cancel()
 err = s.IncCtx(ctx) // error: already locked
 ```
 
-### With auto-decrement
+#### With auto-decrement
 
 ```go
 s := New(1)
