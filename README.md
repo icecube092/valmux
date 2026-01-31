@@ -1,5 +1,7 @@
 # Value-based mutex library
 
+[![Tests](https://github.com/icecube092/valmux/actions/workflows/tests.yml/badge.svg)](https://github.com/icecube092/valmux/actions/workflows/tests.yml)
+
 ### Simple
 
 ```go
@@ -12,7 +14,6 @@ s.Dec()
 err = s.Inc() // nil
 
 ```
-
 
 ### With context
 
