@@ -5,20 +5,27 @@ import (
 	"math"
 	"time"
 	"sync/atomic"
+	"errors"
 )
 
-type Single struct {
+const DefaultTimeout = time.Second
+
+var ErrMaxCount = errors.New("count exceeded")
+var ErrIntegerOverflow = errors.New("integer overflow")
+
+type ValMux struct {
 	current  atomic.Uint64
 	maxCount uint64
+	timeout  time.Duration
 
 	mustWait      bool
 	checkInterval time.Duration
 }
 
-func NewSingle(maxCount uint64, opts ...SingleOption) *Single {
-	s := &Single{
+func New(maxCount uint64, opts ...Option) *ValMux {
+	s := &ValMux{
 		maxCount: maxCount,
-		mustWait: false,
+		timeout:  DefaultTimeout,
 	}
 
 	for _, opt := range opts {
@@ -29,12 +36,12 @@ func NewSingle(maxCount uint64, opts ...SingleOption) *Single {
 }
 
 // IncAutoDec increments value and then decrements it in background on context done.
-func (v *Single) IncAutoDec(ctx context.Context) error {
+func (v *ValMux) IncAutoDec(ctx context.Context) error {
 	return v.AddAutoSub(ctx, 1)
 }
 
 // AddAutoSub adds value and then subtracts it in background on context done.
-func (v *Single) AddAutoSub(ctx context.Context, value uint64) error {
+func (v *ValMux) AddAutoSub(ctx context.Context, value uint64) error {
 	if err := v.AddCtx(ctx, value); err != nil {
 		return err
 	}
@@ -48,35 +55,33 @@ func (v *Single) AddAutoSub(ctx context.Context, value uint64) error {
 	return nil
 }
 
-// IncCtx tries to increment until context alive in case of waiting mode.
-// Otherwise, it returns immediately.
-func (v *Single) IncCtx(ctx context.Context) error {
+// IncCtx tries to increment until context alive.
+func (v *ValMux) IncCtx(ctx context.Context) error {
 	return v.AddCtx(ctx, 1)
 }
 
-// AddCtx tries to add value until context alive in case of waiting mode.
-// Otherwise, it returns immediately.
-func (v *Single) AddCtx(ctx context.Context, value uint64) error {
+// AddCtx tries to add value until context alive.
+func (v *ValMux) AddCtx(ctx context.Context, value uint64) error {
 	return v.add(ctx, value)
 }
 
 // Inc increments value.
-func (v *Single) Inc() error {
+func (v *ValMux) Inc() error {
 	return v.Add(1)
 }
 
 // Add adds value.
-func (v *Single) Add(value uint64) error {
+func (v *ValMux) Add(value uint64) error {
 	return v.add(context.Background(), value)
 }
 
 // Dec decrements value.
-func (v *Single) Dec() {
+func (v *ValMux) Dec() {
 	v.Sub(1)
 }
 
 // Sub subtracts value.
-func (v *Single) Sub(value uint64) {
+func (v *ValMux) Sub(value uint64) {
 	var swapped bool
 	for !swapped {
 		cur := v.current.Load()
@@ -89,7 +94,7 @@ func (v *Single) Sub(value uint64) {
 }
 
 // Reset sets value to 0.
-func (v *Single) Reset() {
+func (v *ValMux) Reset() {
 	var swapped bool
 	for !swapped {
 		swapped = v.current.CompareAndSwap(v.current.Load(), 0)
@@ -97,16 +102,19 @@ func (v *Single) Reset() {
 }
 
 // Max returns maximum available value.
-func (v *Single) Max() uint64 {
+func (v *ValMux) Max() uint64 {
 	return v.maxCount
 }
 
 // Current returns current value.
-func (v *Single) Current() uint64 {
+func (v *ValMux) Current() uint64 {
 	return v.current.Load()
 }
 
-func (v *Single) add(ctx context.Context, value uint64) error {
+func (v *ValMux) add(ctx context.Context, value uint64) error {
+	ctx, cancel := context.WithTimeout(ctx, v.timeout)
+	defer cancel()
+
 	var ticker *time.Ticker
 	if v.mustWait {
 		ticker = time.NewTicker(v.checkInterval)

@@ -7,16 +7,16 @@ import (
 	"errors"
 )
 
-func TestSingle(t *testing.T) {
+func TestValMux(t *testing.T) {
 	tests := []struct {
 		name   string
-		valmux *Single
-		do     func(v *Single)
+		valmux *ValMux
+		do     func(v *ValMux)
 	}{
 		{
 			name:   "Inc",
-			valmux: NewSingle(1),
-			do: func(v *Single) {
+			valmux: New(1),
+			do: func(v *ValMux) {
 				var err error
 				if v.Max() != 1 {
 					t.Fatal(err)
@@ -53,8 +53,8 @@ func TestSingle(t *testing.T) {
 		},
 		{
 			name:   "IncAutoDec",
-			valmux: NewSingle(2),
-			do: func(v *Single) {
+			valmux: New(2),
+			do: func(v *ValMux) {
 				var err error
 				if v.Max() != 2 {
 					t.Fatal(err)
@@ -85,8 +85,8 @@ func TestSingle(t *testing.T) {
 		},
 		{
 			name:   "IncAutoDec WithWaiting timeout exceeded",
-			valmux: NewSingle(1, WithWaiting(time.Millisecond)),
-			do: func(v *Single) {
+			valmux: New(1, WithWaiting(time.Millisecond)),
+			do: func(v *ValMux) {
 				const timeout = 10 * time.Millisecond
 				var err error
 				if v.Max() != 1 {
@@ -114,8 +114,8 @@ func TestSingle(t *testing.T) {
 		},
 		{
 			name:   "AddAutoSub WithWaiting",
-			valmux: NewSingle(2, WithWaiting(time.Millisecond)),
-			do: func(v *Single) {
+			valmux: New(2, WithWaiting(time.Millisecond)),
+			do: func(v *ValMux) {
 				const timeout = 10 * time.Millisecond
 				var err error
 				if v.Max() != 2 {
@@ -146,6 +146,45 @@ func TestSingle(t *testing.T) {
 
 				if v.Current() != 2 {
 					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name:   "AddAutoSub WithWaiting WithTimeout",
+			valmux: New(2, WithWaiting(time.Millisecond), WithTimeout(time.Millisecond)),
+			do: func(v *ValMux) {
+				const timeout = 10 * time.Millisecond
+				var err error
+				if v.Max() != 2 {
+					t.Fatal(err)
+				}
+
+				ctx, cancel := context.WithTimeout(context.Background(), timeout)
+				defer cancel()
+				biggerCtx, cancel2 := context.WithTimeout(context.Background(), timeout)
+				defer cancel2()
+
+				err = v.AddAutoSub(ctx, 1)
+				if err != nil {
+					t.Fatal(err)
+					return
+				}
+
+				waitCh := make(chan struct{})
+				go func() {
+					err = v.AddAutoSub(biggerCtx, 2)
+					if !errors.Is(err, context.DeadlineExceeded) {
+						t.Error()
+					}
+					waitCh <- struct{}{}
+				}()
+
+				<-waitCh
+
+				time.Sleep(timeout) // needs some time after context done
+
+				if v.Current() != 0 {
+					t.Fatal()
 				}
 			},
 		},
