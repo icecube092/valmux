@@ -30,7 +30,7 @@ cancel()
 err = s.IncCtx(ctx) // error: already locked
 ```
 
-#### With auto-decrement
+### With auto-decrement
 
 ```go
 s := New(1)
