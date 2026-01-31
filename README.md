@@ -1,6 +1,7 @@
 # Value-based mutex library
 
 [![Tests](https://github.com/icecube092/valmux/actions/workflows/tests.yml/badge.svg)](https://github.com/icecube092/valmux/actions/workflows/tests.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/icecube092/valmux.svg)](https://pkg.go.dev/github.com/icecube092/valmux)
 
 ### Simple
 
