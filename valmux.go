@@ -8,25 +8,27 @@ import (
 	"errors"
 )
 
-const DefaultTimeout = time.Second
-
 var ErrMaxCount = errors.New("count exceeded")
 var ErrIntegerOverflow = errors.New("integer overflow")
 
+// ValMux represents semaphore-like structure with max limit.
+// See docs for the details.
 type ValMux struct {
 	current  atomic.Uint64
-	maxCount uint64
+	maxCount atomic.Uint64
 	timeout  time.Duration
 
 	mustWait      bool
 	checkInterval time.Duration
 }
 
+// New returns new instance of ValMux.
 func New(maxCount uint64, opts ...Option) *ValMux {
 	s := &ValMux{
-		maxCount: maxCount,
+		maxCount: atomic.Uint64{},
 		timeout:  DefaultTimeout,
 	}
+	s.maxCount.Store(maxCount)
 
 	for _, opt := range opts {
 		opt(s)
@@ -41,9 +43,27 @@ func (v *ValMux) IncAutoDec(ctx context.Context) error {
 }
 
 // AddAutoSub adds value and then subtracts it in background on context done.
+//
+// If ctx has timeout then this timeout is used.
+// If ctx has no timeout then internal timeout is used.
+// If completely no timeout then Sub occurs immediately after Add.
 func (v *ValMux) AddAutoSub(ctx context.Context, value uint64) error {
+	cancel := func() {}
+	_, externalTimeout := ctx.Deadline()
+	internalTimeout := v.timeout != NoTimeout
+
+	if !externalTimeout && internalTimeout {
+		ctx, cancel = context.WithTimeout(ctx, v.timeout)
+		defer cancel()
+	}
+
 	if err := v.AddCtx(ctx, value); err != nil {
 		return err
+	}
+
+	if _, timeoutExists := ctx.Deadline(); !timeoutExists {
+		v.Sub(value)
+		return nil
 	}
 
 	context.AfterFunc(
@@ -61,8 +81,25 @@ func (v *ValMux) IncCtx(ctx context.Context) error {
 }
 
 // AddCtx tries to add value until context alive.
+//
+// If ctx has timeout then this timeout is used.
+// if ctx has no timeout then internal timeout is used.
+// If completely no timeout then function waits until success.
 func (v *ValMux) AddCtx(ctx context.Context, value uint64) error {
-	return v.add(ctx, value)
+	cancel := func() {}
+	_, externalTimeout := ctx.Deadline()
+	internalTimeout := v.timeout != NoTimeout
+
+	if !externalTimeout && internalTimeout {
+		ctx, cancel = context.WithTimeout(ctx, v.timeout)
+		defer cancel()
+	}
+
+	if err := v.add(ctx, value); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Inc increments value.
@@ -101,9 +138,17 @@ func (v *ValMux) Reset() {
 	}
 }
 
+func (v *ValMux) SetOpts(opts ...Option) *ValMux {
+	for _, opt := range opts {
+		opt(v)
+	}
+
+	return v
+}
+
 // Max returns maximum available value.
 func (v *ValMux) Max() uint64 {
-	return v.maxCount
+	return v.maxCount.Load()
 }
 
 // Current returns current value.
@@ -111,10 +156,17 @@ func (v *ValMux) Current() uint64 {
 	return v.current.Load()
 }
 
-func (v *ValMux) add(ctx context.Context, value uint64) error {
-	ctx, cancel := context.WithTimeout(ctx, v.timeout)
-	defer cancel()
+// Timeout returns maximum timeout for -Ctx methods.
+func (v *ValMux) Timeout() time.Duration {
+	return v.timeout
+}
 
+// WaitingMode returns flag is instance in Waiting mode or not.
+func (v *ValMux) WaitingMode() bool {
+	return v.mustWait
+}
+
+func (v *ValMux) add(ctx context.Context, value uint64) error {
 	var ticker *time.Ticker
 	if v.mustWait {
 		ticker = time.NewTicker(v.checkInterval)
@@ -127,14 +179,15 @@ func (v *ValMux) add(ctx context.Context, value uint64) error {
 		}
 
 		cur := v.current.Load()
+		mx := v.maxCount.Load()
 
-		if value > v.maxCount {
+		if value > mx {
 			return ErrMaxCount
 		} else if math.MaxUint64-cur < value {
 			if !v.mustWait {
 				return ErrIntegerOverflow
 			}
-		} else if cur+value > v.maxCount {
+		} else if cur+value > mx {
 			if !v.mustWait {
 				return ErrMaxCount
 			}
